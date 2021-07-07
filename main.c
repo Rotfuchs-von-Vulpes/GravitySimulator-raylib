@@ -80,9 +80,9 @@ int main(void)
   camera.zoom = 1.0f;
 
   newBody(0, 0, 0, 0, 10000, 15);
-  // newBody(0, 50, -4.47, 0, 1, 5);
-  // newBody(0, -100, 3.16, 0, 1, 5);
-  // newBody(150, 0, 0, 2.58, 1, 5);
+  newBody(0, 50, -4.47, 0, 1, 5);
+  newBody(0, -100, 3.16, 0, 1, 5);
+  newBody(150, 0, 0, 2.58, 1, 5);
 
 
   // gravity simulation
@@ -174,8 +174,8 @@ int main(void)
           bodies[body].radius, BLUE
         );
       }
-      Vector2 debug3 = gridPositionConverter(camera.zoom, camera.target, mousePosition, screen);
-      DrawCircle(debug3.x, debug3.y, 5, GREEN);
+      // Vector2 debug3 = gridPositionConverter(camera.zoom, camera.target, mousePosition, screen);
+      // DrawCircle(debug3.x, debug3.y, 5, GREEN);
       EndMode2D();
 
       // só faz char str[16]; e snprintf(str, 16, "%d", num);
@@ -184,10 +184,10 @@ int main(void)
       if (!pause) DrawText("paused", 10, 30, 20, GRAY);
       char debug1[16];
       snprintf(debug1, 16, "%i", bodyFocus);
-      DrawText(debug1, 10, 50, 20, GRAY);
+      // DrawText(debug1, 10, 50, 20, GRAY);
       char debug2[16];
       snprintf(debug2, 16, "%i", focus);
-      DrawText(debug2, 10, 70, 20, GRAY);
+      // DrawText(debug2, 10, 70, 20, GRAY);
       
 
       EndDrawing();
