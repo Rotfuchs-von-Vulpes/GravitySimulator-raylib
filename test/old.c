@@ -1,22 +1,59 @@
 #include "raylib.h"
 #include <math.h>
+#include <stdio.h>
 
 // celestic bodys
-float bodyPosition[50][2];
-float bodyVelocity[50][2];
-float bodyForces[50][2];
-float bodyMass[50];
-float bodyRadius[50];
+struct celesticBody{
+  Vector2 position;
+  Vector2 velocity;
+  Vector2 forces;
+  float mass;
+  float radius;
+};
+
+struct celesticBody bodies[50];
+
 unsigned int bodyNumber = 0;
 
 void newBody(float x, float y, float vx, float vy, float m, float r) {
-  bodyPosition[bodyNumber][0] = x;
-  bodyPosition[bodyNumber][1] = y;
-  bodyVelocity[bodyNumber][0] = vx;
-  bodyVelocity[bodyNumber][1] = vy;
-  bodyMass[bodyNumber] = m;
-  bodyRadius[bodyNumber] = r;
+  
+  bodies[bodyNumber].position.x = x;
+  bodies[bodyNumber].position.y = y;
+  bodies[bodyNumber].velocity.x = vx;
+  bodies[bodyNumber].velocity.y = vy;
+  bodies[bodyNumber].mass = m;
+  bodies[bodyNumber].radius = r;
+
   bodyNumber++;
+}
+
+Vector2 plus(Vector2 u, Vector2 v) {
+  return (Vector2){u.x + v.x, u.y + v.y};
+}
+
+Vector2 minus(Vector2 u, Vector2 v) {
+  return (Vector2){u.x - v.x, u.y - v.y};
+}
+
+Vector2 sTimes(float k, Vector2 v) {
+  return (Vector2){k * v.x, k * v.y};
+}
+
+Vector2 sDivide(float k, Vector2 v) {
+  return (Vector2){v.x / k, v.y / k};
+}
+
+Vector2 gridPositionConverter(float zoom, Vector2 gridCenter, Vector2 screenPostion, Vector2 screen) {
+  return (Vector2)(plus(sDivide(zoom, minus(screenPostion, sDivide(2, screen))), gridCenter));
+}
+
+float squareDistance(Vector2 u, Vector2 v) {
+  Vector2 w = minus(u, w);
+  return powf((u.x - v.x), 2) + powf((u.y - v.y), 2);
+}
+
+float collision(Vector2 positionA, Vector2 positionB, float distance) {
+  return (bool)(squareDistance(positionA, positionB) < distance);
 }
 
 int main(void)
@@ -25,25 +62,33 @@ int main(void)
   //--------------------------------------------------------------------------------------
   
   // screen
-  const int screenWidth = 800;
-  const int screenHeight = 450;
-  InitWindow(screenWidth, screenHeight, "Gravity Simulator");
+  const Vector2 screen = { 800, 450 };
+  InitWindow(screen.x, screen.y, "Gravity Simulator");
 
   // mouse
-  // Vector2 mousePosition = { -100.0f, -100.0f };
+  Vector2 wherePressed = { 0, 0 };
+  Vector2 mousePosition = { -100.0f, -100.0f };
+  size_t bodyFocus = 0, focus = 1;
 
   // grid
-  float dx = 0;
-  float dy = 0;
+  Vector2 target = {0, 0};
+  Camera2D camera = { 0 };
+  camera.target = target;
+  camera.offset = (Vector2){ screen.x / 2.0f, screen.y / 2.0f };
+  camera.zoom = 1.0f;
 
-  newBody(400, 200, 0, 0, 10000, 15);
-  newBody(400, 100, 3.16, 0, 1, 5);
-  newBody(400, 250, -4.47, 0, 1, 5);
-  newBody(550, 0, 0, 2.58, 1, 5);
+  newBody(0, 0, 0, 0, 10000, 15);
+  newBody(0, 50, -4.47, 0, 1, 5);
+  newBody(0, -100, 3.16, 0, 1, 5);
+  newBody(150, 0, 0, 2.58, 1, 5);
 
 
-  // gravity
+  // gravity simulation
+  bool pause = 1;
   const float_t gravityConstant = 0.1;
+
+  // debug
+  bool debug = 0;
 
   SetTargetFPS(60);
   //--------------------------------------------------------------------------------------
@@ -54,43 +99,62 @@ int main(void)
     //----------------------------------------------------------------------------------
     
     // keyboard
-    if (IsKeyDown(KEY_RIGHT)) dx += 2.0f;
-    if (IsKeyDown(KEY_LEFT)) dx -= 2.0f;
-    if (IsKeyDown(KEY_UP)) dy -= 2.0f;
-    if (IsKeyDown(KEY_DOWN)) dy += 2.0f;
+    if (IsKeyPressed(KEY_SPACE)) pause = !pause;
+    if (IsKeyPressed(KEY_F1)) debug = !debug;
 
     // mouse
-    // mousePosition = GetMousePosition();
+    mousePosition = GetMousePosition();
+    Vector2 mousePositionInGrid = gridPositionConverter(camera.zoom, camera.target, mousePosition, screen);
 
-    // forces
-    float bodyForces[bodyNumber][2];
-
-    for (int body = 0; body < bodyNumber; body++) {
-      bodyForces[body][0] = 0;
-      bodyForces[body][1] = 0;
+    if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+      target = mousePosition;
+      wherePressed = camera.target;
+    }
+    if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
+      Vector2 draged = sDivide(camera.zoom, minus(target, mousePosition));
+      camera.target = plus(wherePressed, draged);
     }
 
-    for (int i = 0; i < bodyNumber - 1; i++) {
-      for (int j = i + 1; j < bodyNumber; j++) {
-        float distance2D[2];
-        distance2D[0] = bodyPosition[i][0] - bodyPosition[j][0];
-        distance2D[1] = bodyPosition[i][1] - bodyPosition[j][1];
-        float distance = powf(distance2D[0], 2) + powf(distance2D[1], 2);
-
-        float bodyForce = gravityConstant * bodyMass[i] * bodyMass[j] / powf(distance, 1.5);
-        bodyForces[i][0] -= distance2D[0] * bodyForce;
-        bodyForces[i][1] -= distance2D[1] * bodyForce;
-        bodyForces[j][0] += distance2D[0] * bodyForce;
-        bodyForces[j][1] += distance2D[1] * bodyForce;
+    focus = 1;
+    for (size_t body = 0; body < bodyNumber; body++) {
+      if (collision(bodies[body].position, mousePositionInGrid, powf(bodies[body].radius, 2))) {
+        bodyFocus = body;
+        focus = 0;
+        break;
       }
     }
 
-    // movimenty
-    for (int body = 0; body < bodyNumber; body++) {
-      bodyVelocity[body][0] += bodyForces[body][0] / bodyMass[body];
-      bodyVelocity[body][1] += bodyForces[body][1] / bodyMass[body];
-      bodyPosition[body][0] += bodyVelocity[body][0];
-      bodyPosition[body][1] += bodyVelocity[body][1];
+    float wheel = GetMouseWheelMove();
+    if (wheel) {
+      camera.zoom *= 0.5f * wheel + 1;
+    }
+
+    // simulation
+    if (pause) {
+
+      // forces
+      for (size_t body = 0; body < bodyNumber; body++) {
+        bodies[body].forces.x = 0;
+        bodies[body].forces.y = 0;
+      }
+      for (size_t i = 0; i < bodyNumber - 1; i++) {
+        for (size_t j = i + 1; j < bodyNumber; j++) {
+
+          Vector2 distance2D = minus(bodies[i].position, bodies[j].position);
+          float distance = powf(distance2D.x, 2) + powf(distance2D.y, 2);
+
+          float bodyForce = gravityConstant * bodies[i].mass * bodies[j].mass / powf(distance, 1.5);
+
+          bodies[i].forces = minus(bodies[i].forces, sTimes(bodyForce, distance2D));
+          bodies[j].forces = plus(bodies[j].forces, sTimes(bodyForce, distance2D));
+        }
+      }
+
+      // movimenty
+      for (size_t body = 0; body < bodyNumber; body++) {
+        bodies[body].velocity = plus(bodies[body].velocity, sDivide(bodies[body].mass, bodies[body].forces));
+        bodies[body].position = plus(bodies[body].position, bodies[body].velocity);
+      }
     }
 
     //----------------------------------------------------------------------------------
@@ -99,19 +163,48 @@ int main(void)
     //----------------------------------------------------------------------------------
       BeginDrawing();
 
-      ClearBackground(RAYWHITE);
+      ClearBackground((Color){20, 19, 22, 255});
 
-      for (int body = 0; body < bodyNumber; body++) {
-        DrawCircle(bodyPosition[body][0] + dx, bodyPosition[body][1] + dy, bodyRadius[body], BLUE);
+      BeginMode2D(camera);
 
-        // vectors
-        float forceX = bodyForces[body][0] + bodyPosition[body][0];
-        float forceY = bodyForces[body][1] + bodyPosition[body][1];
-        float velocityX = bodyVelocity[body][0] + bodyPosition[body][0];
-        float velocityY = bodyVelocity[body][1] + bodyPosition[body][1];
-        DrawLine(bodyPosition[body][0], bodyPosition[body][1], forceX, forceY, RED);
-        DrawLine(bodyPosition[body][0], bodyPosition[body][1], velocityX, velocityY, RED);
+      for (size_t body = 0; body < bodyNumber; body++) {
+        DrawCircle(
+          bodies[body].position.x,
+          bodies[body].position.y,
+          bodies[body].radius, BLUE
+        );
       }
+
+      if (debug) {
+        Vector2 debug3 = gridPositionConverter(camera.zoom, camera.target, mousePosition, screen);
+        DrawCircle(debug3.x, debug3.y, 5, GREEN);
+        for (size_t body = 0; body < bodyNumber; body++) {
+          Vector2 bodyPosition = bodies[body].position;
+          DrawLine(bodyPosition.x, bodyPosition.y, debug3.x, debug3.y, RED);
+          float distance = powf(squareDistance(bodyPosition, debug3), 0.5f);
+          Vector2 textPosition = sDivide(2, plus(bodyPosition, debug3));
+          char debug1[16];
+          snprintf(debug1, 16, "%f", distance);
+          DrawText(debug1, textPosition.x, textPosition.y, 5, RED);
+        }
+      }
+
+      EndMode2D();
+
+      // só faz char str[16]; e snprintf(str, 16, "%d", num);
+
+      DrawFPS(10, 10);
+      if (!pause) DrawText("paused", 10, 30, 20, GRAY);
+
+      if (debug) {
+        char debug1[16];
+        snprintf(debug1, 16, "%i", bodyFocus);
+        DrawText(debug1, 10, 50, 20, GRAY);
+        char debug2[16];
+        snprintf(debug2, 16, "%i", focus);
+        DrawText(debug2, 10, 70, 20, GRAY);
+      }
+      
 
       EndDrawing();
       //----------------------------------------------------------------------------------
