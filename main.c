@@ -87,6 +87,7 @@ int main(void)
 
   // gravity simulation
   bool pause = 1;
+  short unsigned int simulationSpeed = 1;
   const float_t gravityConstant = 0.1;
 
   // debug
@@ -103,8 +104,11 @@ int main(void)
     // keyboard
     if (IsKeyPressed(KEY_SPACE)) pause = !pause;
     if (IsKeyPressed(KEY_F1)) debug = !debug;
+    if (IsKeyPressed(KEY_COMMA) && simulationSpeed > 1) simulationSpeed--;
+    if (IsKeyPressed(KEY_PERIOD) && simulationSpeed < 5) simulationSpeed++;
 
     // mouse
+
     mousePosition = GetMousePosition();
     Vector2 mousePositionInGrid = gridPositionConverter(camera.zoom, camera.target, mousePosition, screen);
 
@@ -139,33 +143,37 @@ int main(void)
     float wheel = GetMouseWheelMove();
     if (wheel) {
       camera.zoom *= 0.5f * wheel + 1;
+
+      // Vector2 normalize = sDivide(camera.zoom, minus(screen, mousePosition));
+      // camera.target = plus(normalize, gridPositionConverter(camera.zoom, camera.target, mousePosition, screen));
     }
 
     // simulation
     if (pause) {
-
-      // forces
-      for (size_t body = 0; body < bodyNumber; body++) {
-        bodies[body].forces.x = 0;
-        bodies[body].forces.y = 0;
-      }
-      for (size_t i = 0; i < bodyNumber - 1; i++) {
-        for (size_t j = i + 1; j < bodyNumber; j++) {
-
-          Vector2 distance2D = minus(bodies[i].position, bodies[j].position);
-          float distance = powf(distance2D.x, 2) + powf(distance2D.y, 2);
-
-          float bodyForce = gravityConstant * bodies[i].mass * bodies[j].mass / powf(distance, 1.5);
-
-          bodies[i].forces = minus(bodies[i].forces, sTimes(bodyForce, distance2D));
-          bodies[j].forces = plus(bodies[j].forces, sTimes(bodyForce, distance2D));
+      for (size_t time = 0; time < simulationSpeed; time++) {
+        // forces
+        for (size_t body = 0; body < bodyNumber; body++) {
+          bodies[body].forces.x = 0;
+          bodies[body].forces.y = 0;
         }
-      }
+        for (size_t i = 0; i < bodyNumber - 1; i++) {
+          for (size_t j = i + 1; j < bodyNumber; j++) {
 
-      // movimenty
-      for (size_t body = 0; body < bodyNumber; body++) {
-        bodies[body].velocity = plus(bodies[body].velocity, sDivide(bodies[body].mass, bodies[body].forces));
-        bodies[body].position = plus(bodies[body].position, bodies[body].velocity);
+            Vector2 distance2D = minus(bodies[i].position, bodies[j].position);
+            float distance = powf(distance2D.x, 2) + powf(distance2D.y, 2);
+
+            float bodyForce = gravityConstant * bodies[i].mass * bodies[j].mass / powf(distance, 1.5);
+
+            bodies[i].forces = minus(bodies[i].forces, sTimes(bodyForce, distance2D));
+            bodies[j].forces = plus(bodies[j].forces, sTimes(bodyForce, distance2D));
+          }
+        }
+
+        // movimenty
+        for (size_t body = 0; body < bodyNumber; body++) {
+          bodies[body].velocity = plus(bodies[body].velocity, sDivide(bodies[body].mass, bodies[body].forces));
+          bodies[body].position = plus(bodies[body].position, bodies[body].velocity);
+        }
       }
     }
 
@@ -196,36 +204,28 @@ int main(void)
         );
       }
 
-      if (debug) {
-        Vector2 debug3 = gridPositionConverter(camera.zoom, camera.target, mousePosition, screen);
-        DrawCircle(debug3.x, debug3.y, 5, GREEN);
-        for (size_t body = 0; body < bodyNumber; body++) {
-          Vector2 bodyPosition = bodies[body].position;
-          DrawLine(bodyPosition.x, bodyPosition.y, debug3.x, debug3.y, RED);
-          float distance = powf(squareDistance(bodyPosition, debug3), 0.5f);
-          Vector2 textPosition = sDivide(2, plus(bodyPosition, debug3));
-          char debug1[16];
-          snprintf(debug1, 16, "%f", distance);
-          DrawText(debug1, textPosition.x, textPosition.y, 5, RED);
-        }
-      }
-
       EndMode2D();
 
       // só faz char str[16]; e snprintf(str, 16, "%d", num);
 
       DrawFPS(10, 10);
       if (!pause) DrawText("paused", 10, 30, 20, GRAY);
+      char speedText[16];
+      snprintf(speedText, 16, "%ix", simulationSpeed);
+      DrawText(speedText, 10, 50, 20, GRAY);
 
       if (debug) {
+        Vector2 debug3 = gridPositionConverter(camera.zoom, camera.target, mousePosition, screen);
+        DrawCircle(debug3.x, debug3.y, 5, GREEN);
+        
         char debug1[16];
         snprintf(debug1, 16, "%i", bodyTarget);
-        DrawText(debug1, 10, 50, 20, GRAY);
+        DrawText(debug1, 10, 70, 20, GRAY);
+        
         char debug2[16];
         snprintf(debug2, 16, "%i", ObjectInCursor);
-        DrawText(debug2, 10, 70, 20, GRAY);
+        DrawText(debug2, 10, 90, 20, GRAY);
       }
-      
 
       EndDrawing();
       //----------------------------------------------------------------------------------
