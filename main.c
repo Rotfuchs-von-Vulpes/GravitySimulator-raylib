@@ -38,22 +38,18 @@ void newBody(float x, float y, float vx, float vy, float m, float r)
 
 void removeBody(unsigned int index)
 {
-	if (index > bodyNumber)
-	{
-		return;
-	}
-	else if (index == bodyNumber)
+	if (index == bodyNumber)
 	{
 		bodyNumber--;
-		return;
 	}
-
-	for (size_t i = index; i < bodyNumber - 1; i++)
+	else if (index < bodyNumber)
 	{
-		bodies[i] = bodies[i + 1];
+		bodyNumber--;
+		for (size_t i = index; i < bodyNumber; i++)
+		{
+			bodies[i] = bodies[i + 1];
+		}
 	}
-
-	bodyNumber--;
 }
 
 Vector2 plus(Vector2 u, Vector2 v)
@@ -83,7 +79,6 @@ Vector2 gridPositionConverter(float zoom, Vector2 gridCenter, Vector2 screenPost
 
 float squareDistance(Vector2 u, Vector2 v)
 {
-	Vector2 w = minus(u, w);
 	return (u.x - v.x) * (u.x - v.x) + (u.y - v.y) * (u.y - v.y);
 }
 
@@ -146,6 +141,11 @@ int main(void)
 
 	// debug
 	bool debug = false;
+
+	// button colors
+	Color dragIconColor = ORANGE;
+	Color createIconColor = WHITE;
+	Color removeIconColor = WHITE;
 
 	SetTargetFPS(60);
 	//--------------------------------------------------------------------------------------
@@ -267,14 +267,23 @@ int main(void)
 				if (mousePosition.x >= 0 && mousePosition.x < screen.x / 3)
 				{
 					mode = Drag;
+					dragIconColor = ORANGE;
+					createIconColor = WHITE;
+					removeIconColor = WHITE;
 				}
 				else if (mousePosition.x >= screen.x / 3 && mousePosition.x < 2 * screen.x / 3)
 				{
 					mode = Create;
+					dragIconColor = WHITE;
+					createIconColor = ORANGE;
+					removeIconColor = WHITE;
 				}
 				else if (mousePosition.x >= 2 * screen.x / 3 && mousePosition.x < screen.x)
 				{
 					mode = Remove;
+					dragIconColor = WHITE;
+					createIconColor = WHITE;
+					removeIconColor = ORANGE;
 				}
 
 				// unfocus
@@ -362,30 +371,12 @@ int main(void)
 
 		DrawRectangle(0, screen.y - 50, screen.x, 50, GRAY);
 
-		Color dragIconColor = WHITE;
-		Color createIconColor = WHITE;
-		Color removeIconColor = WHITE;
-
-		switch (mode)
-		{
-		case Drag:
-			dragIconColor = ORANGE;
-			break;
-		case Create:
-		case Shoot:
-			createIconColor = ORANGE;
-			break;
-		case Remove:
-			removeIconColor = ORANGE;
-			break;
-		}
-
 		drawDragIcon((Vector2){screen.x / 4, screen.y - 25}, dragIconColor);
 		drawCreateIcon((Vector2){2 * screen.x / 4, screen.y - 25}, createIconColor);
 		drawRemoveIcon((Vector2){3 * screen.x / 4, screen.y - 25}, removeIconColor);
 
 		DrawFPS(10, 10);
-		if (!pause)
+		if (pause)
 			DrawText("paused", 10, 30, 20, GRAY);
 		char speedText[16];
 		snprintf(speedText, 16, "%ix", simulationSpeed);
