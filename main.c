@@ -36,6 +36,26 @@ void newBody(float x, float y, float vx, float vy, float m, float r)
 	bodyNumber++;
 }
 
+void removeBody(unsigned int index)
+{
+	if (index > bodyNumber)
+	{
+		return;
+	}
+	else if (index == bodyNumber)
+	{
+		bodyNumber--;
+		return;
+	}
+
+	for (size_t i = index; i < bodyNumber - 1; i++)
+	{
+		bodies[i] = bodies[i + 1];
+	}
+
+	bodyNumber--;
+}
+
 Vector2 plus(Vector2 u, Vector2 v)
 {
 	return (Vector2){u.x + v.x, u.y + v.y};
@@ -103,7 +123,7 @@ int main(void)
 	bool canDrag = true;
 	Vector2 mousePosition = {-100.0f, -100.0f};
 	size_t bodyTarget = 0, bodyFocus = 0;
-	bool ObjectInCursor = false;
+	bool objectInCursor = false;
 
 	// grid
 	Vector2 target = {0, 0};
@@ -130,12 +150,9 @@ int main(void)
 	SetTargetFPS(60);
 	//--------------------------------------------------------------------------------------
 
-	int ang = 0;
-
 	// Main game loop
 	while (!WindowShouldClose())
 	{
-		ang++;
 		// Update
 		//----------------------------------------------------------------------------------
 
@@ -155,39 +172,46 @@ int main(void)
 
 		if (mousePosition.y <= screen.y - 50)
 		{
-			switch (mode)
+			// move camera
+			if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
 			{
-			case Drag:
-			case Create:
-			case Remove:
-				if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
-				{
-					target = mousePosition;
-					wherePressed = camera.target;
-					canDrag = true;
-					focus = false;
-				}
-				if (canDrag && IsMouseButtonDown(MOUSE_RIGHT_BUTTON))
-				{
-					Vector2 draged = sDivide(camera.zoom, minus(target, mousePosition));
-					camera.target = plus(wherePressed, draged);
-				}
-				if (IsMouseButtonUp(MOUSE_RIGHT_BUTTON))
-				{
-					canDrag = false;
-				}
-
-				break;
-			case Shoot:
-
-				break;
+				target = mousePosition;
+				wherePressed = camera.target;
+				canDrag = true;
+				focus = false;
 			}
+			if (canDrag && IsMouseButtonDown(MOUSE_RIGHT_BUTTON))
+			{
+				Vector2 draged = sDivide(camera.zoom, minus(target, mousePosition));
+				camera.target = plus(wherePressed, draged);
+			}
+			if (IsMouseButtonUp(MOUSE_RIGHT_BUTTON))
+			{
+				canDrag = false;
+			}
+
+			if (mode == Drag || mode == Remove)
+			{
+				// find body in a cursor
+				objectInCursor = 0;
+				for (size_t body = 0; body < bodyNumber; body++)
+				{
+					if (collision(bodies[body].position, mousePositionInGrid, bodies[body].radius * bodies[body].radius))
+					{
+						bodyFocus = body;
+						objectInCursor = true;
+						break;
+					}
+				}
+			}
+
 			switch (mode)
 			{
 			case Drag:
+				// focus in a body
 				if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
 				{
-					if (ObjectInCursor)
+					if (objectInCursor)
 					{
 						focus = true;
 						bodyTarget = bodyFocus;
@@ -198,17 +222,6 @@ int main(void)
 					}
 				}
 
-				ObjectInCursor = 0;
-				for (size_t body = 0; body < bodyNumber; body++)
-				{
-					if (collision(bodies[body].position, mousePositionInGrid, bodies[body].radius * bodies[body].radius))
-					{
-						bodyFocus = body;
-						ObjectInCursor = true;
-						break;
-					}
-				}
-
 				break;
 			case Create:
 
@@ -217,25 +230,38 @@ int main(void)
 
 				break;
 			case Remove:
+				// remove a body
+				if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+				{
+					if (objectInCursor)
+					{
+						removeBody(bodyFocus);
+					}
+				}
+
 				break;
 			}
 
 			float wheel = GetMouseWheelMove();
 			if (wheel)
 			{
-				camera.zoom *= 0.5f * wheel + 1;
-				if (!focus)
+				if (mode == Create)
 				{
-					camera.target = mousePositionInGrid;
-					SetMousePosition(screen.x / 2, screen.y / 2);
+				}
+				else
+				{
+					camera.zoom *= 0.5f * wheel + 1;
+					if (!focus)
+					{
+						camera.target = mousePositionInGrid;
+						SetMousePosition(screen.x / 2, screen.y / 2);
+					}
 				}
 			}
 		}
 		else
 		{
-			if (ObjectInCursor)
-				ObjectInCursor = false;
-
+			// buttons
 			if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 			{
 				if (mousePosition.x >= 0 && mousePosition.x < screen.x / 3)
@@ -250,6 +276,10 @@ int main(void)
 				{
 					mode = Remove;
 				}
+
+				// unfocus
+				if (focus && mode != Drag)
+					focus = false;
 			}
 		}
 
@@ -288,7 +318,7 @@ int main(void)
 			}
 		}
 
-		// grid
+		// grid move
 		if (focus)
 		{
 			camera.target = bodies[bodyTarget].position;
@@ -304,9 +334,20 @@ int main(void)
 
 		BeginMode2D(camera);
 
-		if (ObjectInCursor)
+		Color color;
+
+		if (mode == Drag)
 		{
-			DrawCircle(bodies[bodyFocus].position.x, bodies[bodyFocus].position.y, bodies[bodyFocus].radius + 2, WHITE);
+			color = WHITE;
+		}
+		else if (mode == Remove)
+		{
+			color = RED;
+		}
+
+		if (objectInCursor)
+		{
+			DrawCircle(bodies[bodyFocus].position.x, bodies[bodyFocus].position.y, bodies[bodyFocus].radius + 2, color);
 		}
 
 		for (size_t body = 0; body < bodyNumber; body++)
@@ -321,26 +362,27 @@ int main(void)
 
 		DrawRectangle(0, screen.y - 50, screen.x, 50, GRAY);
 
+		Color dragIconColor = WHITE;
+		Color createIconColor = WHITE;
+		Color removeIconColor = WHITE;
+
 		switch (mode)
 		{
 		case Drag:
-			drawDragIcon((Vector2){screen.x / 4, screen.y - 25}, ORANGE);
-			drawCreateIcon((Vector2){2 * screen.x / 4, screen.y - 25}, WHITE);
-			drawRemoveIcon((Vector2){3 * screen.x / 4, screen.y - 25}, WHITE);
+			dragIconColor = ORANGE;
 			break;
 		case Create:
 		case Shoot:
-			drawDragIcon((Vector2){screen.x / 4, screen.y - 25}, WHITE);
-			drawCreateIcon((Vector2){2 * screen.x / 4, screen.y - 25}, ORANGE);
-			drawRemoveIcon((Vector2){3 * screen.x / 4, screen.y - 25}, WHITE);
+			createIconColor = ORANGE;
 			break;
 		case Remove:
-			drawDragIcon((Vector2){screen.x / 4, screen.y - 25}, WHITE);
-			drawCreateIcon((Vector2){2 * screen.x / 4, screen.y - 25}, WHITE);
-			drawRemoveIcon((Vector2){3 * screen.x / 4, screen.y - 25}, ORANGE);
-		default:
+			removeIconColor = ORANGE;
 			break;
 		}
+
+		drawDragIcon((Vector2){screen.x / 4, screen.y - 25}, dragIconColor);
+		drawCreateIcon((Vector2){2 * screen.x / 4, screen.y - 25}, createIconColor);
+		drawRemoveIcon((Vector2){3 * screen.x / 4, screen.y - 25}, removeIconColor);
 
 		DrawFPS(10, 10);
 		if (!pause)
@@ -359,7 +401,7 @@ int main(void)
 			DrawText(debug1, 10, 70, 20, GRAY);
 
 			char debug2[16];
-			snprintf(debug2, 16, "%i", ObjectInCursor);
+			snprintf(debug2, 16, "%i", objectInCursor);
 			DrawText(debug2, 10, 90, 20, GRAY);
 		}
 
