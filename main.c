@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 // celestic bodys
-struct celesticBody
+struct CelesticBody
 {
 	Vector2 position;
 	Vector2 velocity;
@@ -12,7 +12,7 @@ struct celesticBody
 	float radius;
 };
 
-struct celesticBody bodies[50];
+struct CelesticBody bodies[50];
 unsigned int bodyNumber = 0;
 
 enum modes
@@ -44,11 +44,7 @@ void removeBody(unsigned int index)
 	}
 	else if (index < bodyNumber)
 	{
-		bodyNumber--;
-		for (size_t i = index; i < bodyNumber; i++)
-		{
-			bodies[i] = bodies[i + 1];
-		}
+		bodies[index] = bodies[--bodyNumber];
 	}
 }
 
@@ -128,6 +124,15 @@ int main(void)
 	camera.zoom = 1.0f;
 	bool focus = false;
 
+	// create mode rules
+	struct CelesticBody ghostBody = {
+		position: (Vector2){0, 0},
+		velocity: (Vector2){0, 0},
+		mass: 10,
+		radius: 10
+	};
+	Vector2 positionOfCreation = (Vector2){0, 0};
+
 	// bodies
 	newBody(0, 0, 0, 0, 10000, 15);
 	newBody(0, 50, -4.47, 0, 1, 5);
@@ -139,13 +144,12 @@ int main(void)
 	short unsigned int simulationSpeed = 1;
 	const float_t gravityConstant = 0.1;
 
-	// debug
-	bool debug = false;
-
 	// button colors
 	Color dragIconColor = ORANGE;
 	Color createIconColor = WHITE;
 	Color removeIconColor = WHITE;
+
+	bool debug = false;
 
 	SetTargetFPS(60);
 	//--------------------------------------------------------------------------------------
@@ -205,12 +209,21 @@ int main(void)
 				}
 			}
 
-			switch (mode)
+			if (mode == Create)
 			{
-			case Drag:
-				// focus in a body
-				if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+				ghostBody.position = mousePositionInGrid;
+			}
+
+			if (mode == Shoot)
+			{
+				ghostBody.velocity = sDivide(10, minus(positionOfCreation, mousePosition));
+			}
+
+			if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+			{
+				switch (mode)
 				{
+				case Drag:
 					if (objectInCursor)
 					{
 						focus = true;
@@ -220,26 +233,22 @@ int main(void)
 					{
 						focus = false;
 					}
-				}
-
-				break;
-			case Create:
-
-				break;
-			case Shoot:
-
-				break;
-			case Remove:
-				// remove a body
-				if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-				{
+					break;
+				case Create:
+					positionOfCreation = mousePosition;
+					mode = Shoot;
+					break;
+				case Shoot:
+					newBody(ghostBody.position.x, ghostBody.position.y, ghostBody.velocity.x, ghostBody.velocity.y, ghostBody.mass, ghostBody.radius);
+					mode = Create;
+					break;
+				case Remove:
 					if (objectInCursor)
 					{
 						removeBody(bodyFocus);
 					}
+					break;
 				}
-
-				break;
 			}
 
 			float wheel = GetMouseWheelMove();
@@ -247,6 +256,8 @@ int main(void)
 			{
 				if (mode == Create)
 				{
+					ghostBody.mass *= 2.0f * (0.5f * wheel + 1);
+					ghostBody.radius *= 0.5f * wheel + 1;
 				}
 				else
 				{
@@ -264,21 +275,21 @@ int main(void)
 			// buttons
 			if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 			{
-				if (mousePosition.x >= 0 && mousePosition.x < screen.x / 3)
+				if (mode != Drag && mousePosition.x >= 0 && mousePosition.x < screen.x / 3)
 				{
 					mode = Drag;
 					dragIconColor = ORANGE;
 					createIconColor = WHITE;
 					removeIconColor = WHITE;
 				}
-				else if (mousePosition.x >= screen.x / 3 && mousePosition.x < 2 * screen.x / 3)
+				else if (mode != Create && mousePosition.x >= screen.x / 3 && mousePosition.x < 2 * screen.x / 3)
 				{
 					mode = Create;
 					dragIconColor = WHITE;
 					createIconColor = ORANGE;
 					removeIconColor = WHITE;
 				}
-				else if (mousePosition.x >= 2 * screen.x / 3 && mousePosition.x < screen.x)
+				else if (mode != Remove && mousePosition.x >= 2 * screen.x / 3 && mousePosition.x < screen.x)
 				{
 					mode = Remove;
 					dragIconColor = WHITE;
@@ -357,6 +368,16 @@ int main(void)
 		if (objectInCursor)
 		{
 			DrawCircle(bodies[bodyFocus].position.x, bodies[bodyFocus].position.y, bodies[bodyFocus].radius + 2, color);
+		}
+
+		if (mode == Create)
+		{
+			DrawCircle(ghostBody.position.x, ghostBody.position.y, ghostBody.radius, YELLOW);
+		}
+		else if (mode == Shoot)
+		{
+			DrawLine(ghostBody.position.x, ghostBody.position.y, ghostBody.position.x - 10 * ghostBody.velocity.x, ghostBody.position.y - 10 * ghostBody.velocity.y, WHITE);
+			DrawCircle(ghostBody.position.x, ghostBody.position.y, ghostBody.radius, GREEN);
 		}
 
 		for (size_t body = 0; body < bodyNumber; body++)
