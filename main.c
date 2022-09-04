@@ -13,8 +13,15 @@ struct celesticBody
 };
 
 struct celesticBody bodies[50];
-
 unsigned int bodyNumber = 0;
+
+enum modes
+{
+	Drag,
+	Create,
+	Shoot,
+	Remove
+} mode = Drag;
 
 void newBody(float x, float y, float vx, float vy, float m, float r)
 {
@@ -65,6 +72,23 @@ float collision(Vector2 positionA, Vector2 positionB, float distance)
 	return (bool)(squareDistance(positionA, positionB) < distance);
 }
 
+void drawDragIcon(Vector2 position, Color color)
+{
+	DrawCircle(position.x, position.y, 20, color);
+}
+
+void drawCreateIcon(Vector2 position, Color color)
+{
+	DrawRectangle(position.x - 5, position.y - 20, 10, 40, color);
+	DrawRectangle(position.x - 20, position.y - 5, 40, 10, color);
+}
+
+void drawRemoveIcon(Vector2 position, Color color)
+{
+	DrawRectanglePro((Rectangle){position.x, position.y, 10, 40}, (Vector2){5, 20}, 135, color);
+	DrawRectanglePro((Rectangle){position.x, position.y, 10, 40}, (Vector2){5, 20}, 45, color);
+}
+
 int main(void)
 {
 	// Initialization
@@ -76,9 +100,10 @@ int main(void)
 
 	// mouse
 	Vector2 wherePressed = {0, 0};
+	bool canDrag = true;
 	Vector2 mousePosition = {-100.0f, -100.0f};
 	size_t bodyTarget = 0, bodyFocus = 0;
-	bool ObjectInCursor = 0;
+	bool ObjectInCursor = false;
 
 	// grid
 	Vector2 target = {0, 0};
@@ -86,7 +111,7 @@ int main(void)
 	camera.target = target;
 	camera.offset = (Vector2){screen.x / 2.0f, screen.y / 2.0f};
 	camera.zoom = 1.0f;
-	bool focus = 0;
+	bool focus = false;
 
 	// bodies
 	newBody(0, 0, 0, 0, 10000, 15);
@@ -95,19 +120,22 @@ int main(void)
 	newBody(150, 0, 0, 2.58, 1, 5);
 
 	// gravity simulation
-	bool pause = 1;
+	bool pause = false;
 	short unsigned int simulationSpeed = 1;
 	const float_t gravityConstant = 0.1;
 
 	// debug
-	bool debug = 0;
+	bool debug = false;
 
 	SetTargetFPS(60);
 	//--------------------------------------------------------------------------------------
 
+	int ang = 0;
+
 	// Main game loop
 	while (!WindowShouldClose())
 	{
+		ang++;
 		// Update
 		//----------------------------------------------------------------------------------
 
@@ -122,59 +150,111 @@ int main(void)
 			simulationSpeed++;
 
 		// mouse
-
 		mousePosition = GetMousePosition();
 		Vector2 mousePositionInGrid = gridPositionConverter(camera.zoom, camera.target, mousePosition, screen);
 
-		if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
+		if (mousePosition.y <= screen.y - 50)
 		{
-			target = mousePosition;
-			wherePressed = camera.target;
-			focus = 0;
-		}
-		if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON))
-		{
-			Vector2 draged = sDivide(camera.zoom, minus(target, mousePosition));
-			camera.target = plus(wherePressed, draged);
-		}
-
-		ObjectInCursor = 0;
-		for (size_t body = 0; body < bodyNumber; body++)
-		{
-			if (collision(bodies[body].position, mousePositionInGrid, powf(bodies[body].radius, 2)))
+			switch (mode)
 			{
-				bodyFocus = body;
-				ObjectInCursor = 1;
+			case Drag:
+			case Create:
+			case Remove:
+				if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
+				{
+					target = mousePosition;
+					wherePressed = camera.target;
+					canDrag = true;
+					focus = false;
+				}
+				if (canDrag && IsMouseButtonDown(MOUSE_RIGHT_BUTTON))
+				{
+					Vector2 draged = sDivide(camera.zoom, minus(target, mousePosition));
+					camera.target = plus(wherePressed, draged);
+				}
+				if (IsMouseButtonUp(MOUSE_RIGHT_BUTTON))
+				{
+					canDrag = false;
+				}
+
+				break;
+			case Shoot:
+
 				break;
 			}
-		}
+			switch (mode)
+			{
+			case Drag:
+				if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+				{
+					if (ObjectInCursor)
+					{
+						focus = true;
+						bodyTarget = bodyFocus;
+					}
+					else
+					{
+						focus = false;
+					}
+				}
 
-		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+				ObjectInCursor = 0;
+				for (size_t body = 0; body < bodyNumber; body++)
+				{
+					if (collision(bodies[body].position, mousePositionInGrid, bodies[body].radius * bodies[body].radius))
+					{
+						bodyFocus = body;
+						ObjectInCursor = true;
+						break;
+					}
+				}
+
+				break;
+			case Create:
+
+				break;
+			case Shoot:
+
+				break;
+			case Remove:
+				break;
+			}
+
+			float wheel = GetMouseWheelMove();
+			if (wheel)
+			{
+				camera.zoom *= 0.5f * wheel + 1;
+				if (!focus)
+				{
+					camera.target = mousePositionInGrid;
+					SetMousePosition(screen.x / 2, screen.y / 2);
+				}
+			}
+		}
+		else
 		{
 			if (ObjectInCursor)
-			{
-				focus = 1;
-				bodyTarget = bodyFocus;
-			}
-			else
-			{
-				focus = 0;
-			}
-		}
+				ObjectInCursor = false;
 
-		float wheel = GetMouseWheelMove();
-		if (wheel)
-		{
-			camera.zoom *= 0.5f * wheel + 1;
-			if (!focus)
+			if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 			{
-				camera.target = mousePositionInGrid;
-				SetMousePosition(screen.x / 2, screen.y / 2);
-			} 
+				if (mousePosition.x >= 0 && mousePosition.x < screen.x / 3)
+				{
+					mode = Drag;
+				}
+				else if (mousePosition.x >= screen.x / 3 && mousePosition.x < 2 * screen.x / 3)
+				{
+					mode = Create;
+				}
+				else if (mousePosition.x >= 2 * screen.x / 3 && mousePosition.x < screen.x)
+				{
+					mode = Remove;
+				}
+			}
 		}
 
 		// simulation
-		if (pause)
+		if (!pause)
 		{
 			for (size_t time = 0; time < simulationSpeed; time++)
 			{
@@ -232,14 +312,35 @@ int main(void)
 		for (size_t body = 0; body < bodyNumber; body++)
 		{
 			DrawCircle(
-				bodies[body].position.x,
-				bodies[body].position.y,
-				bodies[body].radius, BLUE);
+					bodies[body].position.x,
+					bodies[body].position.y,
+					bodies[body].radius, BLUE);
 		}
 
 		EndMode2D();
-		
-		// DrawRectangle(0, screen.y - 50, screen.x, 50, GRAY);
+
+		DrawRectangle(0, screen.y - 50, screen.x, 50, GRAY);
+
+		switch (mode)
+		{
+		case Drag:
+			drawDragIcon((Vector2){screen.x / 4, screen.y - 25}, ORANGE);
+			drawCreateIcon((Vector2){2 * screen.x / 4, screen.y - 25}, WHITE);
+			drawRemoveIcon((Vector2){3 * screen.x / 4, screen.y - 25}, WHITE);
+			break;
+		case Create:
+		case Shoot:
+			drawDragIcon((Vector2){screen.x / 4, screen.y - 25}, WHITE);
+			drawCreateIcon((Vector2){2 * screen.x / 4, screen.y - 25}, ORANGE);
+			drawRemoveIcon((Vector2){3 * screen.x / 4, screen.y - 25}, WHITE);
+			break;
+		case Remove:
+			drawDragIcon((Vector2){screen.x / 4, screen.y - 25}, WHITE);
+			drawCreateIcon((Vector2){2 * screen.x / 4, screen.y - 25}, WHITE);
+			drawRemoveIcon((Vector2){3 * screen.x / 4, screen.y - 25}, ORANGE);
+		default:
+			break;
+		}
 
 		DrawFPS(10, 10);
 		if (!pause)
