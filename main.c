@@ -173,12 +173,12 @@ int main(void)
 	} mode = Drag;
 
 	struct CelesticBody ghostBody = {
-		position: (Vector2){0, 0},
-		velocity: (Vector2){0, 0},
-		mass: 10,
-		radius: cbrtf(40 / (3 * density * PI))
+		.position = {0, 0},
+		.velocity = {0, 0},
+		.mass = 10,
+		.radius = cbrtf(40 / (3 * density * PI))
 	};
-	Vector2 positionOfCreation = (Vector2){0, 0};
+	Vector2 positionOfCreation = {0, 0};
 
 	// gravity simulation
 	bool pause = false;
