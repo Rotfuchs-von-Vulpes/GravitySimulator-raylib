@@ -2,8 +2,8 @@
 #include <math.h>
 #include <stdio.h>
 
-#define gravityConstant 0.001
-#define density 50000
+#define gravityConstant 0.005
+#define density 1
 
 // celestic bodys
 struct CelesticBody
@@ -21,14 +21,14 @@ unsigned int bodyNumber = 0;
 char debugText1[16] = "";
 char debugText2[16] = "";
 
-void newBody(float x, float y, float vx, float vy, float m, float r)
+void newBody(float x, float y, float vx, float vy, float m)
 {
 	bodies[bodyNumber].position.x = x;
 	bodies[bodyNumber].position.y = y;
 	bodies[bodyNumber].velocity.x = vx;
 	bodies[bodyNumber].velocity.y = vy;
 	bodies[bodyNumber].mass = m;
-	bodies[bodyNumber].radius = r;
+	bodies[bodyNumber].radius = cbrtf(4 * m / (3 * density * PI));
 
 	bodyNumber++;
 }
@@ -45,7 +45,7 @@ void removeBody(unsigned int index)
 	}
 }
 
-void orbitBody(unsigned int index, float x, float y, float m, float r)
+void orbitBody(unsigned int index, float x, float y, float m)
 {
 	struct CelesticBody body = bodies[index];
 
@@ -66,7 +66,7 @@ void orbitBody(unsigned int index, float x, float y, float m, float r)
 	snprintf(debugText1, 16, "%f", realVelocity);
 	snprintf(debugText1, 16, "%f", sqrtf(vx*vx + vy*vy));
 
-	newBody(q.x, q.y, -vx + v2.x, vy + v2.y, m, r);
+	newBody(q.x, q.y, -vx + v2.x, vy + v2.y, m);
 }
 
 void bodyCollision(unsigned int index1, unsigned int index2)
@@ -74,8 +74,8 @@ void bodyCollision(unsigned int index1, unsigned int index2)
 	struct CelesticBody body1 = bodies[index1];
 	struct CelesticBody body2 = bodies[index2];
 
-	removeBody(index1);
 	removeBody(index2);
+	removeBody(index1);
 
 	float x = (body1.mass * body1.position.x + body2.mass * body2.position.x) / (body1.mass + body2.mass);
 	float y = (body1.mass * body1.position.y + body2.mass * body2.position.y) / (body1.mass + body2.mass);
@@ -83,9 +83,8 @@ void bodyCollision(unsigned int index1, unsigned int index2)
 	float vy = (body1.mass * body1.velocity.y + body2.mass * body2.velocity.y) / (body1.mass + body2.mass);
 
 	float m = body1.mass + body2.mass;
-	float r = m / density;
 
-	newBody(x, y, vx, vy, m, r);
+	newBody(x, y, vx, vy, m);
 }
 
 Vector2 plus(Vector2 u, Vector2 v)
@@ -177,7 +176,7 @@ int main(void)
 		position: (Vector2){0, 0},
 		velocity: (Vector2){0, 0},
 		mass: 10,
-		radius: 10 / density
+		radius: cbrtf(40 / (3 * density * PI))
 	};
 	Vector2 positionOfCreation = (Vector2){0, 0};
 
@@ -283,13 +282,14 @@ int main(void)
 				case Shoot:
 					if (objectInCursor)
 					{
-						orbitBody(bodyFocus, ghostBody.position.x, ghostBody.position.y, ghostBody.mass * ghostBody.mass * ghostBody.mass, ghostBody.radius);
+						orbitBody(bodyFocus, ghostBody.position.x, ghostBody.position.y, ghostBody.mass * ghostBody.mass * ghostBody.mass);
 					}
 					else
 					{
-						newBody(ghostBody.position.x, ghostBody.position.y, ghostBody.velocity.x, ghostBody.velocity.y, ghostBody.mass * ghostBody.mass * ghostBody.mass, ghostBody.radius);
+						newBody(ghostBody.position.x, ghostBody.position.y, ghostBody.velocity.x, ghostBody.velocity.y, ghostBody.mass * ghostBody.mass * ghostBody.mass);
 					}
 					mode = Create;
+					objectInCursor = false;
 
 					break;
 				case Remove:
@@ -307,16 +307,13 @@ int main(void)
 			{
 				if (mode == Create)
 				{
-					if (wheel < 1)
+					float mass = ghostBody.mass + 10 * wheel;
+
+					if (mass > 1)
 					{
-						if (ghostBody.mass > 1)
-							ghostBody.mass += 5 * wheel;
+						ghostBody.mass = mass;
+						ghostBody.radius = cbrtf(4 * mass * mass * mass / (3 * density * PI));
 					}
-					else
-					{
-						ghostBody.mass += 5 * wheel;
-					}
-					ghostBody.radius = ghostBody.mass * ghostBody.mass * ghostBody.mass / density;
 				}
 				else
 				{
@@ -452,7 +449,7 @@ int main(void)
 		}
 		else if (mode == Shoot)
 		{
-			DrawLine(ghostBody.position.x, ghostBody.position.y, ghostBody.position.x + 10 * ghostBody.velocity.x, ghostBody.position.y + 10 * ghostBody.velocity.y, WHITE);
+			DrawLine(ghostBody.position.x, ghostBody.position.y, ghostBody.position.x - 10 * ghostBody.velocity.x, ghostBody.position.y - 10 * ghostBody.velocity.y, WHITE);
 			DrawCircle(ghostBody.position.x, ghostBody.position.y, ghostBody.radius, GREEN);
 		}
 
@@ -490,7 +487,7 @@ int main(void)
 			DrawText(debug2, 10, 90, 20, GRAY);
 
 			char debug3[16];
-			snprintf(debug3, 16, "%f", ghostBody.mass);
+			snprintf(debug3, 16, "%f", ghostBody.mass * ghostBody.mass * ghostBody.mass);
 			DrawText(debug3, 10, 110, 20, GRAY);
 			
 			DrawText(debugText1, 10, 130, 20, GRAY);
