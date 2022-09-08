@@ -2,6 +2,9 @@
 #include <math.h>
 #include <stdio.h>
 
+#define gravityConstant 0.001
+#define density 50000
+
 // celestic bodys
 struct CelesticBody
 {
@@ -15,17 +18,11 @@ struct CelesticBody
 struct CelesticBody bodies[50];
 unsigned int bodyNumber = 0;
 
-enum modes
-{
-	Drag,
-	Create,
-	Shoot,
-	Remove
-} mode = Drag;
+char debugText1[16] = "";
+char debugText2[16] = "";
 
 void newBody(float x, float y, float vx, float vy, float m, float r)
 {
-
 	bodies[bodyNumber].position.x = x;
 	bodies[bodyNumber].position.y = y;
 	bodies[bodyNumber].velocity.x = vx;
@@ -46,6 +43,49 @@ void removeBody(unsigned int index)
 	{
 		bodies[index] = bodies[--bodyNumber];
 	}
+}
+
+void orbitBody(unsigned int index, float x, float y, float m, float r)
+{
+	struct CelesticBody body = bodies[index];
+
+	float m2 = body.mass;
+	Vector2 v2 = body.velocity;
+	Vector2 p = body.position;
+	Vector2 q = {x, y};
+
+	float dx = p.x - q.x;
+	float dy = p.y - q.y;
+	float distance = sqrtf(dx * dx + dy * dy);
+	float realVelocity = sqrtf(m2 * gravityConstant / distance);
+	float bodyVelocity = sqrtf(m2 * gravityConstant / (distance * distance * distance));
+
+	float vx = bodyVelocity * dy;
+	float vy = bodyVelocity * dx;
+
+	snprintf(debugText1, 16, "%f", realVelocity);
+	snprintf(debugText1, 16, "%f", sqrtf(vx*vx + vy*vy));
+
+	newBody(q.x, q.y, -vx + v2.x, vy + v2.y, m, r);
+}
+
+void bodyCollision(unsigned int index1, unsigned int index2)
+{
+	struct CelesticBody body1 = bodies[index1];
+	struct CelesticBody body2 = bodies[index2];
+
+	removeBody(index1);
+	removeBody(index2);
+
+	float x = (body1.mass * body1.position.x + body2.mass * body2.position.x) / (body1.mass + body2.mass);
+	float y = (body1.mass * body1.position.y + body2.mass * body2.position.y) / (body1.mass + body2.mass);
+	float vx = (body1.mass * body1.velocity.x + body2.mass * body2.velocity.x) / (body1.mass + body2.mass);
+	float vy = (body1.mass * body1.velocity.y + body2.mass * body2.velocity.y) / (body1.mass + body2.mass);
+
+	float m = body1.mass + body2.mass;
+	float r = m / density;
+
+	newBody(x, y, vx, vy, m, r);
 }
 
 Vector2 plus(Vector2 u, Vector2 v)
@@ -124,25 +164,26 @@ int main(void)
 	camera.zoom = 1.0f;
 	bool focus = false;
 
-	// create mode rules
+	// modes rules
+	enum modes
+	{
+		Drag,
+		Create,
+		Shoot,
+		Remove
+	} mode = Drag;
+
 	struct CelesticBody ghostBody = {
 		position: (Vector2){0, 0},
 		velocity: (Vector2){0, 0},
 		mass: 10,
-		radius: 10
+		radius: 10 / density
 	};
 	Vector2 positionOfCreation = (Vector2){0, 0};
-
-	// bodies
-	newBody(0, 0, 0, 0, 10000, 15);
-	newBody(0, 50, -4.47, 0, 1, 5);
-	newBody(0, -100, 3.16, 0, 1, 5);
-	newBody(150, 0, 0, 2.58, 1, 5);
 
 	// gravity simulation
 	bool pause = false;
 	short unsigned int simulationSpeed = 1;
-	const float_t gravityConstant = 0.1;
 
 	// button colors
 	Color dragIconColor = ORANGE;
@@ -194,10 +235,10 @@ int main(void)
 				canDrag = false;
 			}
 
-			if (mode == Drag || mode == Remove)
+			if (mode != Create)
 			{
 				// find body in a cursor
-				objectInCursor = 0;
+				objectInCursor = false;
 				for (size_t body = 0; body < bodyNumber; body++)
 				{
 					if (collision(bodies[body].position, mousePositionInGrid, bodies[body].radius * bodies[body].radius))
@@ -233,20 +274,30 @@ int main(void)
 					{
 						focus = false;
 					}
+
 					break;
 				case Create:
 					positionOfCreation = mousePosition;
 					mode = Shoot;
 					break;
 				case Shoot:
-					newBody(ghostBody.position.x, ghostBody.position.y, ghostBody.velocity.x, ghostBody.velocity.y, ghostBody.mass, ghostBody.radius);
+					if (objectInCursor)
+					{
+						orbitBody(bodyFocus, ghostBody.position.x, ghostBody.position.y, ghostBody.mass * ghostBody.mass * ghostBody.mass, ghostBody.radius);
+					}
+					else
+					{
+						newBody(ghostBody.position.x, ghostBody.position.y, ghostBody.velocity.x, ghostBody.velocity.y, ghostBody.mass * ghostBody.mass * ghostBody.mass, ghostBody.radius);
+					}
 					mode = Create;
+
 					break;
 				case Remove:
 					if (objectInCursor)
 					{
 						removeBody(bodyFocus);
 					}
+
 					break;
 				}
 			}
@@ -256,8 +307,16 @@ int main(void)
 			{
 				if (mode == Create)
 				{
-					ghostBody.mass *= 2.0f * (0.5f * wheel + 1);
-					ghostBody.radius *= 0.5f * wheel + 1;
+					if (wheel < 1)
+					{
+						if (ghostBody.mass > 1)
+							ghostBody.mass += 5 * wheel;
+					}
+					else
+					{
+						ghostBody.mass += 5 * wheel;
+					}
+					ghostBody.radius = ghostBody.mass * ghostBody.mass * ghostBody.mass / density;
 				}
 				else
 				{
@@ -304,28 +363,41 @@ int main(void)
 		}
 
 		// simulation
-		if (!pause)
+		if (!pause && bodyNumber > 0)
 		{
 			for (size_t time = 0; time < simulationSpeed; time++)
 			{
 				// forces
 				for (size_t body = 0; body < bodyNumber; body++)
 				{
-					bodies[body].forces.x = 0;
-					bodies[body].forces.y = 0;
+					if (isnan(bodies[body].position.x) || isnan(bodies[body].position.x))
+					{
+						removeBody(body);
+					}
+					else
+					{
+						bodies[body].forces.x = 0;
+						bodies[body].forces.y = 0;
+					}
 				}
 				for (size_t i = 0; i < bodyNumber - 1; i++)
 				{
 					for (size_t j = i + 1; j < bodyNumber; j++)
 					{
-
 						Vector2 distance2D = minus(bodies[i].position, bodies[j].position);
-						float distance = powf(distance2D.x, 2) + powf(distance2D.y, 2);
+						float distance = distance2D.x * distance2D.x + distance2D.y * distance2D.y;
 
-						float bodyForce = gravityConstant * bodies[i].mass * bodies[j].mass / powf(distance, 1.5);
+						if (distance <= (bodies[i].radius + bodies[j].radius) * (bodies[i].radius + bodies[j].radius))
+						{
+							bodyCollision(i, j);
+						}
+						else
+						{
+							float bodyForce = gravityConstant * bodies[i].mass * bodies[j].mass / powf(distance, 1.5);
 
-						bodies[i].forces = minus(bodies[i].forces, sTimes(bodyForce, distance2D));
-						bodies[j].forces = plus(bodies[j].forces, sTimes(bodyForce, distance2D));
+							bodies[i].forces = minus(bodies[i].forces, sTimes(bodyForce, distance2D));
+							bodies[j].forces = plus(bodies[j].forces, sTimes(bodyForce, distance2D));
+						}
 					}
 				}
 
@@ -364,6 +436,10 @@ int main(void)
 		{
 			color = RED;
 		}
+		else if (mode == Shoot)
+		{
+			color = ORANGE;
+		}
 
 		if (objectInCursor)
 		{
@@ -376,7 +452,7 @@ int main(void)
 		}
 		else if (mode == Shoot)
 		{
-			DrawLine(ghostBody.position.x, ghostBody.position.y, ghostBody.position.x - 10 * ghostBody.velocity.x, ghostBody.position.y - 10 * ghostBody.velocity.y, WHITE);
+			DrawLine(ghostBody.position.x, ghostBody.position.y, ghostBody.position.x + 10 * ghostBody.velocity.x, ghostBody.position.y + 10 * ghostBody.velocity.y, WHITE);
 			DrawCircle(ghostBody.position.x, ghostBody.position.y, ghostBody.radius, GREEN);
 		}
 
@@ -405,9 +481,6 @@ int main(void)
 
 		if (debug)
 		{
-			Vector2 debug3 = gridPositionConverter(camera.zoom, camera.target, mousePosition, screen);
-			DrawCircle(debug3.x, debug3.y, 5, GREEN);
-
 			char debug1[16];
 			snprintf(debug1, 16, "%i", bodyTarget);
 			DrawText(debug1, 10, 70, 20, GRAY);
@@ -415,6 +488,14 @@ int main(void)
 			char debug2[16];
 			snprintf(debug2, 16, "%i", objectInCursor);
 			DrawText(debug2, 10, 90, 20, GRAY);
+
+			char debug3[16];
+			snprintf(debug3, 16, "%f", ghostBody.mass);
+			DrawText(debug3, 10, 110, 20, GRAY);
+			
+			DrawText(debugText1, 10, 130, 20, GRAY);
+			
+			DrawText(debugText2, 10, 150, 20, GRAY);
 		}
 
 		EndDrawing();
