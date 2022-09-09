@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include "raymath.h"
 #include <math.h>
 #include <stdio.h>
 
@@ -87,16 +88,6 @@ void bodyCollision(unsigned int index1, unsigned int index2)
 	newBody(x, y, vx, vy, m);
 }
 
-Vector2 plus(Vector2 u, Vector2 v)
-{
-	return (Vector2){u.x + v.x, u.y + v.y};
-}
-
-Vector2 minus(Vector2 u, Vector2 v)
-{
-	return (Vector2){u.x - v.x, u.y - v.y};
-}
-
 Vector2 sTimes(float k, Vector2 v)
 {
 	return (Vector2){k * v.x, k * v.y};
@@ -109,17 +100,12 @@ Vector2 sDivide(float k, Vector2 v)
 
 Vector2 gridPositionConverter(float zoom, Vector2 gridCenter, Vector2 screenPostion, Vector2 screen)
 {
-	return (Vector2)(plus(sDivide(zoom, minus(screenPostion, sDivide(2, screen))), gridCenter));
+	return (Vector2)(Vector2Add(sDivide(zoom, Vector2Subtract(screenPostion, sDivide(2, screen))), gridCenter));
 }
 
 float squareDistance(Vector2 u, Vector2 v)
 {
 	return (u.x - v.x) * (u.x - v.x) + (u.y - v.y) * (u.y - v.y);
-}
-
-float collision(Vector2 positionA, Vector2 positionB, float distance)
-{
-	return (bool)(squareDistance(positionA, positionB) < distance);
 }
 
 void drawDragIcon(Vector2 position, Color color)
@@ -226,8 +212,8 @@ int main(void)
 			}
 			if (canDrag && IsMouseButtonDown(MOUSE_RIGHT_BUTTON))
 			{
-				Vector2 draged = sDivide(camera.zoom, minus(target, mousePosition));
-				camera.target = plus(wherePressed, draged);
+				Vector2 draged = sDivide(camera.zoom, Vector2Subtract(target, mousePosition));
+				camera.target = Vector2Add(wherePressed, draged);
 			}
 			if (IsMouseButtonUp(MOUSE_RIGHT_BUTTON))
 			{
@@ -240,7 +226,7 @@ int main(void)
 				objectInCursor = false;
 				for (size_t body = 0; body < bodyNumber; body++)
 				{
-					if (collision(bodies[body].position, mousePositionInGrid, bodies[body].radius * bodies[body].radius))
+					if (Vector2DistanceSqr(bodies[body].position, mousePositionInGrid) < bodies[body].radius * bodies[body].radius)
 					{
 						bodyFocus = body;
 						objectInCursor = true;
@@ -256,7 +242,7 @@ int main(void)
 
 			if (mode == Shoot)
 			{
-				ghostBody.velocity = sDivide(10, minus(positionOfCreation, mousePosition));
+				ghostBody.velocity = sDivide(10, Vector2Subtract(positionOfCreation, mousePosition));
 			}
 
 			if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
@@ -377,12 +363,13 @@ int main(void)
 						bodies[body].forces.y = 0;
 					}
 				}
+
 				for (size_t i = 0; i < bodyNumber - 1; i++)
 				{
 					for (size_t j = i + 1; j < bodyNumber; j++)
 					{
-						Vector2 distance2D = minus(bodies[i].position, bodies[j].position);
-						float distance = distance2D.x * distance2D.x + distance2D.y * distance2D.y;
+						Vector2 distance2D = Vector2Subtract(bodies[i].position, bodies[j].position);
+						float distance = Vector2DistanceSqr(bodies[i].position, bodies[j].position);
 
 						if (distance <= (bodies[i].radius + bodies[j].radius) * (bodies[i].radius + bodies[j].radius))
 						{
@@ -392,8 +379,8 @@ int main(void)
 						{
 							float bodyForce = gravityConstant * bodies[i].mass * bodies[j].mass / powf(distance, 1.5);
 
-							bodies[i].forces = minus(bodies[i].forces, sTimes(bodyForce, distance2D));
-							bodies[j].forces = plus(bodies[j].forces, sTimes(bodyForce, distance2D));
+							bodies[i].forces = Vector2Subtract(bodies[i].forces, sTimes(bodyForce, distance2D));
+							bodies[j].forces = Vector2Add(bodies[j].forces, sTimes(bodyForce, distance2D));
 						}
 					}
 				}
@@ -401,8 +388,8 @@ int main(void)
 				// movimenty
 				for (size_t body = 0; body < bodyNumber; body++)
 				{
-					bodies[body].velocity = plus(bodies[body].velocity, sDivide(bodies[body].mass, bodies[body].forces));
-					bodies[body].position = plus(bodies[body].position, bodies[body].velocity);
+					bodies[body].velocity = Vector2Add(bodies[body].velocity, sDivide(bodies[body].mass, bodies[body].forces));
+					bodies[body].position = Vector2Add(bodies[body].position, bodies[body].velocity);
 				}
 			}
 		}
