@@ -242,7 +242,7 @@ int main(void)
 
 			if (mode == Shoot)
 			{
-				ghostBody.velocity = sDivide(10, Vector2Subtract(positionOfCreation, mousePosition));
+				ghostBody.velocity = sDivide(10, Vector2Subtract(positionOfCreation, mousePositionInGrid));
 			}
 
 			if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
@@ -262,7 +262,7 @@ int main(void)
 
 					break;
 				case Create:
-					positionOfCreation = mousePosition;
+					positionOfCreation = mousePositionInGrid;
 					mode = Shoot;
 					break;
 				case Shoot:
