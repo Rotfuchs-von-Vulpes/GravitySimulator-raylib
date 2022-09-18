@@ -1,0 +1,5 @@
+mingw32-make game
+make[1]: Entering directory 'H:/Bruno/projetos/raylib/GravitySimulator'
+gcc -o game src/main.c -Wall -std=c99 -D_DEFAULT_SOURCE -Wno-missing-braces -static -s -O2 C:/raylib/raylib//src/raylib.rc.data -Wl,--subsystem,windows -I. -IC:/raylib/raylib//src -IC:/raylib/raylib//src/external -L. -LC:/raylib/raylib//src -LC:/raylib/raylib//src -lraylib -lopengl32 -lgdi32 -lwinmm -DPLATFORM_DESKTOP
+make[1]: Leaving directory 'H:/Bruno/projetos/raylib/GravitySimulator'
+Makefile:371: recipe for target 'all' failed
