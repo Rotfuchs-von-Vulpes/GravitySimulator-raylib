@@ -1,3 +1,5 @@
 *.exe
 .vscode
 main.code-workspace
+Makefile
+Makefile.android
